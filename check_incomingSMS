@@ -1,0 +1,91 @@
+#!/usr/bin/perl -w
+
+=pod
+
+=head1 COPYRIGHT
+
+This software is Copyright (c) 2013 Hampel CoSi Systemhaus GmbH, Robin Schneider
+                               <robin.schneider@hamcos.de>
+
+(Except where explicitly superseded by other copyright notices)
+
+=head1 LICENSE
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+=head1 DESCRIPTION
+
+https://www.monitoringexchange.org/inventory/Check-Plugins/Hardware/Devices/Misc/check_incomingSMS
+
+This plugin checks if there are SMS in the incoming directory. This can be
+useful if you only use the GSM modem for outgoing SMS and there is the
+slightest chances for incoming SMS. It can also be used to check if there are
+SMS in the outgoing directory.
+
+=cut
+
+use strict;
+use warnings;
+
+use Nagios::Plugin;
+my $VERSION = '1.0';
+
+my $p = Nagios::Plugin->new(
+    usage   => "Usage: %s [ -i, --incoming=directory ]",
+    version => $VERSION,
+    blurb   => 'Check if there are SMS in the incoming directory',
+    extra =>
+'This plugin checks if there are SMS in the incoming directory. This can be useful if you only use the GSM modem for outgoing SMS and there is the slightest chances for incoming SMS.',
+);
+
+## Define and document the valid command line options
+## usage, help, version, timeout and verbose are defined by default.
+
+$p->add_arg(
+    spec => 'warning|w=s',
+    help => qq{-w, --warning=INTEGER:INTEGER
+   warning level for incoming SMS (default 0).
+   The state will be WARNING if there is one SMS or more},
+    default => 0,
+);
+
+$p->add_arg(
+    spec => 'critical|c=s',
+    help => qq{-c, --critical=INTEGER:INTEGER
+   critical level for incoming SMS (default 100)},
+    default => 100,
+);
+
+$p->add_arg(
+    spec => 'incoming|i=s',
+    help => qq{-i, --incoming=directory
+   Directory to the SMS incoming directory},
+    default => "/var/spool/sms/incoming/",
+);
+
+$p->getopts;
+
+my $dir = $p->opts->incoming;
+$p->nagios_die("The directory $dir does not exist") unless -d $dir;
+my @sms = glob "$dir/*";
+my $count_sms = @sms;
+my $are_or_is = 'are';
+if ($count_sms == 1) {
+    $are_or_is = 'is';
+}
+
+$p->nagios_exit(
+    return_code => $p->check_threshold($count_sms),
+    message     => " there $are_or_is $count_sms SMS in the incoming directory"
+);

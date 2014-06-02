@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+# encoding: utf-8
+# @author Robin Schneider <robin.schneider@hamcos.de>
+# @company hamcos IT Service GmbH http://www.hamcos.de
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+# @repo https://github.com/hamcos/monitoring-checks
+# This plugin checks if there are disks which are not zeroed over the ZAPI from NetApp.
+# It depends on https://communities.netapp.com/docs/DOC-1152
+
+import sys
+from common import *
+# sys.path.append("/usr/local/lib/python/NetApp/")
+from NaServer import *
+
+args = len(sys.argv) - 1
+if (args < 3):
+    print_usage()
+
+filer    = sys.argv[1]
+user     = sys.argv[2]
+password = sys.argv[3]
+
+s = NaServer(filer, 1, 1)
+s.set_server_type("Filer")
+s.set_admin_user(user, password)
+s.set_transport_type("HTTPS")
+
+output = s.invoke("disk-list-info")
+
+if(output.results_errno() != 0):
+    r = output.results_reason()
+    print("Failed: \n" + str(r))
+
+else :
+    output = output.child_get("disk-details")
+    # print output.sprintf()
+    zeroed     = []
+    not_zeroed = []
+    for i in output.children_get(): # go through disks
+        name = i.child_get_string("name")
+        zeroed_bool = i.child_get_string('is-zeroed')
+        if zeroed_bool != None:
+           if zeroed_bool == 'true':
+              zeroed.append(name)
+           else:
+              not_zeroed.append(name)
+    output = 'OK -'
+    exit_status = 0
+    if len(not_zeroed) != 0:
+       output = 'WARN -'
+       exit_status = 1
+       output += " %s" % ", ".join(not_zeroed)
+    elif len(zeroed) != 0:
+       output += " zeroed: %s" % ", ".join(zeroed)
+    print output
+    sys.exit(exit_status)
