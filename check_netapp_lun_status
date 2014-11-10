@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+# encoding: utf-8
+# @author Robin Schneider <robin.schneider@hamcos.de>
+# @company hamcos IT Service GmbH http://www.hamcos.de
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+
+import sys
+from common import *
+# sys.path.append("/usr/local/lib/python/NetApp/")
+from NaServer import *
+
+args = len(sys.argv) - 1
+if (args < 3):
+    print_usage()
+
+filer    = sys.argv[1]
+user     = sys.argv[2]
+password = sys.argv[3]
+
+s = NaServer(filer, 1, 1)
+s.set_server_type("Filer")
+s.set_admin_user(user, password)
+s.set_transport_type("HTTPS")
+
+output = s.invoke('lun-get-iter')
+
+if(output.results_errno() != 0):
+    r = output.results_reason()
+    print("Failed: \n" + str(r))
+
+else :
+    output = output.child_get('attributes-list')
+    # print output.sprintf()
+    online = []
+    offline = []
+    for i in output.children_get():
+        volume_name = i.child_get_string('volume')
+        if i.child_get_string('online') == 'true':
+            online.append(volume_name)
+        else:
+            offline.append(volume_name)
+    output = 'OK -'
+    exit_status = 0
+    if len(offline) != 0:
+       output = 'WARN -'
+       exit_status = 1
+       output += " %s" % ", ".join(offline)
+    elif len(online) != 0:
+       output += " online: %s" % ", ".join(online)
+    print output
+    sys.exit(exit_status)

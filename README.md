@@ -17,4 +17,8 @@ It depends on https://communities.netapp.com/docs/DOC-1152
 This plugin checks if there is a snapshot newer than one day. The age in days can be adopted with the fourth parameter.
 It depends on https://communities.netapp.com/docs/DOC-1152
 
+## check_netapp_lun_status
+This plugin checks if all LUNs are online.
+It depends on https://communities.netapp.com/docs/DOC-1152
+
 [Monitoring Exchange](https://www.monitoringexchange.org/inventory/Check-Plugins/Hardware/Storage/NetApp/check_netapp_snapshot_age)
