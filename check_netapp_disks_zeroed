@@ -2,10 +2,7 @@
 # encoding: utf-8
 # @author Robin Schneider <robin.schneider@hamcos.de>
 # @company hamcos IT Service GmbH http://www.hamcos.de
-# @licence AGPLv3+ <http://www.gnu.org/licenses/agpl-3.0.html>
-# @repo https://github.com/hamcos/monitoring-checks
-# This plugin checks if there are disks which are not zeroed over the ZAPI from NetApp.
-# It depends on https://communities.netapp.com/docs/DOC-1152
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
 
 import sys
 from common import *
@@ -21,36 +18,45 @@ user     = sys.argv[2]
 password = sys.argv[3]
 
 s = NaServer(filer, 1, 1)
-s.set_server_type("Filer")
+s.set_server_type('Filer')
 s.set_admin_user(user, password)
-s.set_transport_type("HTTPS")
+s.set_transport_type('HTTPS')
 
-output = s.invoke("disk-list-info")
+status_detail = 'UNKNOWN - '
+exit_status = 3
 
-if(output.results_errno() != 0):
-    r = output.results_reason()
-    print("Failed: \n" + str(r))
+output = s.invoke('storage-disk-get-iter')
 
-else :
-    output = output.child_get("disk-details")
-    # print output.sprintf()
-    zeroed     = []
-    not_zeroed = []
-    for i in output.children_get(): # go through disks
-        name = i.child_get_string("name")
-        zeroed_bool = i.child_get_string('is-zeroed')
-        if zeroed_bool != None:
-           if zeroed_bool == 'true':
-              zeroed.append(name)
-           else:
-              not_zeroed.append(name)
-    output = 'OK -'
-    exit_status = 0
+if output.results_errno() != 0:
+    status_detail += str(output.results_reason())
+else:
+    zeroed = dict()
+    not_zeroed = dict()
+
+    output = output.child_get('attributes-list')
+    for i in output.children_get():
+        disk_name = i.child_get_string('disk-name')
+        disk_info = i.child_get('disk-raid-info')
+        spare_pool = disk_info.child_get_string('spare-pool')
+        disk_spare_info = disk_info.child_get('disk-spare-info')
+        if disk_spare_info:
+            zeroed_bool_string = disk_spare_info.child_get_string('is-zeroed')
+            if zeroed_bool_string == 'true':
+                if spare_pool not in zeroed.keys():
+                    zeroed[spare_pool] = []
+                zeroed[spare_pool].append(disk_name)
+            else:
+                if spare_pool not in not_zeroed.keys():
+                    not_zeroed[spare_pool] = []
+                not_zeroed[spare_pool].append(disk_name)
     if len(not_zeroed) != 0:
-       output = 'WARN -'
        exit_status = 1
-       output += " %s" % ", ".join(not_zeroed)
+       status_detail = "WARN - not zeroed: {}".format(not_zeroed)
     elif len(zeroed) != 0:
-       output += " zeroed: %s" % ", ".join(zeroed)
-    print output
-    sys.exit(exit_status)
+       status_detail = "OK - zeroed: {}".format(zeroed)
+       exit_status = 0
+    else:
+       status_detail += "No disks in a spare group found."
+
+print status_detail
+sys.exit(exit_status)

@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+# encoding: utf-8
+# @author Robin Schneider <robin.schneider@hamcos.de>
+# @company hamcos IT Service GmbH http://www.hamcos.de
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+
+import sys
+from common import *
+# sys.path.append("/usr/local/lib/python/NetApp/")
+from NaServer import *
+
+args = len(sys.argv) - 1
+if (args < 3):
+    print_usage()
+
+filer    = sys.argv[1]
+user     = sys.argv[2]
+password = sys.argv[3]
+should_be_up_ports = None
+if args > 3:
+    should_be_up_ports = sys.argv[4].split(',')
+else:
+    print "The following ports are currently up:"
+
+s = NaServer(filer, 1, 1)
+s.set_server_type('Filer')
+s.set_admin_user(user, password)
+s.set_transport_type('HTTPS')
+
+status_detail = 'UNKNOWN - '
+exit_status = 3
+
+output = s.invoke('net-port-get-iter')
+
+if output.results_errno() != 0:
+    status_detail += str(output.results_reason())
+else:
+    are_up_ports = []
+    are_down_ports = []
+
+    output = output.child_get('attributes-list')
+    # print output.sprintf()
+    for i in output.children_get():
+        port_name = i.child_get_string('port')
+        link_status = i.child_get_string('link-status')
+        # print "{}: {}".format(port_name, link_status)
+        if link_status == 'up':
+            are_up_ports.append(port_name)
+            if should_be_up_ports == None:
+                print port_name
+        else:
+            are_down_ports.append(port_name)
+
+    if should_be_up_ports != None:
+        # print ','.join(are_down_ports)
+        down_should_be_up = []
+        for port_should_be_up in should_be_up_ports:
+            if port_should_be_up not in are_up_ports:
+                down_should_be_up.append(port_should_be_up)
+
+        up_but_not_specified = []
+        for is_up_port in are_up_ports:
+            if is_up_port not in should_be_up_ports:
+                up_but_not_specified.append(is_up_port)
+
+        if len(down_should_be_up) != 0:
+            exit_status = 2
+            status_detail = "CRIT - The following ports are down but the should be up: {}".format(', '.join(down_should_be_up))
+        elif len(up_but_not_specified) != 0:
+            exit_status = 1
+            status_detail = "WARN - The following ports are up but it is not specified that they should be up" \
+                " and thus will not be alerted if they are down: {}".format(', '.join(up_but_not_specified))
+        else:
+            status_detail = "OK - All ports which should be up are up: {} (list of all ports which are up)".format(', '.join(are_up_ports))
+            exit_status = 0
+
+print status_detail
+sys.exit(exit_status)

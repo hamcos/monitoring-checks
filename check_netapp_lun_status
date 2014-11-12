@@ -18,34 +18,36 @@ user     = sys.argv[2]
 password = sys.argv[3]
 
 s = NaServer(filer, 1, 1)
-s.set_server_type("Filer")
+s.set_server_type('Filer')
 s.set_admin_user(user, password)
-s.set_transport_type("HTTPS")
+s.set_transport_type('HTTPS')
+
+status_detail = 'UNKNOWN - '
+exit_status = 3
 
 output = s.invoke('lun-get-iter')
 
-if(output.results_errno() != 0):
-    r = output.results_reason()
-    print("Failed: \n" + str(r))
-
+if output.results_errno() != 0:
+    status_detail += str(output.results_reason())
 else :
-    output = output.child_get('attributes-list')
-    # print output.sprintf()
     online = []
     offline = []
+
+    output = output.child_get('attributes-list')
     for i in output.children_get():
         volume_name = i.child_get_string('volume')
         if i.child_get_string('online') == 'true':
             online.append(volume_name)
         else:
             offline.append(volume_name)
-    output = 'OK -'
-    exit_status = 0
     if len(offline) != 0:
-       output = 'WARN -'
        exit_status = 1
-       output += " %s" % ", ".join(offline)
+       status_detail = "WARN -  %s" % ", ".join(offline)
     elif len(online) != 0:
-       output += " online: %s" % ", ".join(online)
-    print output
-    sys.exit(exit_status)
+       status_detail = "OK - online: %s" % ", ".join(online)
+       exit_status = 0
+    else:
+       status_detail += "No LUNs found."
+
+print status_detail
+sys.exit(exit_status)

@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+# encoding: utf-8
+# @author Robin Schneider <robin.schneider@hamcos.de>
+# @company hamcos IT Service GmbH http://www.hamcos.de
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+
+import sys
+from common import *
+# sys.path.append("/usr/local/lib/python/NetApp/")
+from NaServer import *
+
+args = len(sys.argv) - 1
+if (args < 3):
+    print_usage()
+
+filer    = sys.argv[1]
+user     = sys.argv[2]
+password = sys.argv[3]
+
+s = NaServer(filer, 1, 1)
+s.set_server_type('Filer')
+s.set_admin_user(user, password)
+s.set_transport_type('HTTPS')
+
+status_detail = 'UNKNOWN - '
+exit_status = 3
+
+output = s.invoke('net-interface-get-iter')
+
+if output.results_errno() != 0:
+    status_detail += str(output.results_reason())
+else:
+    home = dict()
+    not_home = dict()
+
+    output = output.child_get('attributes-list')
+    # print output.sprintf()
+    for i in output.children_get():
+        current_port = i.child_get_string('current-port')
+        home_port = i.child_get_string('home-port')
+        interface_name = i.child_get_string('interface-name')
+        vserver = i.child_get_string('vserver')
+        is_home_bool_string = i.child_get_string('is-home')
+        name = '{} (current port: {}'.format(interface_name, current_port)
+        if is_home_bool_string == 'true':
+            if vserver not in home.keys():
+                home[vserver] = []
+            home[vserver].append(name + ')')
+        else:
+            if vserver not in not_home.keys():
+                not_home[vserver] = []
+            not_home[vserver].append('{}, home port: {})'.format(name, home_port))
+
+    if len(not_home) != 0:
+       exit_status = 1
+       status_detail = "WARN - The following systems do not work with there home ports: {}".format(not_home)
+    elif len(home) != 0:
+       status_detail = "OK - All systems are using there home port: {}".format(home)
+       exit_status = 0
+    else:
+       status_detail += "No home ports and no ports which are not home ports found."
+
+print status_detail
+sys.exit(exit_status)

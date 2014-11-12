@@ -2,8 +2,7 @@
 # encoding: utf-8
 # @author Robin Schneider <robin.schneider@hamcos.de>
 # @company hamcos IT Service GmbH http://www.hamcos.de
-# @licence AGPLv3+ <http://www.gnu.org/licenses/agpl-3.0.html>
-# It depends on https://communities.netapp.com/docs/DOC-1152
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
 
 import sys, time
 from common import *
@@ -28,43 +27,39 @@ cur_time = int(time.time())
 time_before = cur_time - max_age_days*24*60*60
 
 s = NaServer(filer, 1, 1)
-s.set_server_type("Filer")
+s.set_server_type('Filer')
 s.set_admin_user(user, password)
-s.set_transport_type("HTTPS")
+s.set_transport_type('HTTPS')
 
-output = s.invoke('volume-list-info')
+status_detail = 'UNKNOWN - '
+exit_status = 3
 
-volumes_old_snapshot = []
-volumes_ok = []
-if (output.results_errno() != 0):
-    r = output.results_reason()
-    print("Failed: \n" + str(r))
+output = s.invoke('snapshot-get-iter')
+
+if output.results_errno() != 0:
+    status_detail += str(output.results_reason())
 else:
-    output = output.child_get('volumes')
-    for i in output.children_get(): # go through volumes
-        name = i.child_get_string("name")
-        output = s.invoke('snapshot-list-info', 'target-name', name, 'target-type', 'volume')
-        if (output.results_errno() != 0):
-            r = output.results_reason()
-            print("Failed: \n" + str(r))
-        else:
-            output = output.child_get('snapshots')
-            for i in output.children_get():
-                # name = i.child_get_string("name")
-                access_time = int(i.child_get_string('access-time'))
-                if access_time < time_before:
-                    volumes_old_snapshot.append('%s: %s' % (name, datetime.fromtimestamp(access_time).strftime('%Y-%m-%d %H:%M:%S')))
-                else:
-                    volumes_ok.append(name)
-                break
+    volumes_old_snapshot = []
+    volumes_ok = []
 
-    output = 'OK -'
-    exit_status = 0
+    output = output.child_get('attributes-list')
+    # print output.sprintf()
+    for i in output.children_get():
+        name = i.child_get_string('name')
+        volume = i.child_get_string('volume')
+        access_time = int(i.child_get_string('access-time'))
+        # print ', '.join([ volume, name, str(access_time) ])
+        if access_time < time_before:
+            volumes_old_snapshot.append('%s: %s' % (volume, datetime.fromtimestamp(access_time).strftime('%Y-%m-%d %H:%M:%S')))
+        else:
+            volumes_ok.append(volume)
+
     if len(volumes_old_snapshot) != 0:
-       output = 'WARN -'
        exit_status = 1
-       output += ' %s' % ', '.join(volumes_old_snapshot)
+       status_detail = "WARN - Snapshots older than {} days: {}".format(max_age_days, ', '.join(volumes_old_snapshot))
     elif len(volumes_ok) != 0:
-       output += ' %s' % ', '.join(volumes_ok)
-    print output
-    sys.exit(exit_status)
+        status_detail = "OK - Snapshots are not older than {} days: {}".format(max_age_days, ', '.join(volumes_ok))
+        exit_status = 0
+
+print status_detail
+sys.exit(exit_status)
