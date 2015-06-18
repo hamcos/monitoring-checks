@@ -1,0 +1,3 @@
+[submodule "submodules/Get-DAGHealth"]
+	path = submodules/Get-DAGHealth
+	url = hamcos.github.com:hamcos/Get-DAGHealth.ps1.git
