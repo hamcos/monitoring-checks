@@ -37,7 +37,7 @@
 # ENTITY-MIB::entPhysicalDescr.132 = STRING: MODULE LEVEL1
 
 
-hh3c_entity_cpu_default_levels = (80, 90)
+hh3c_entity_cpu_default_levels = (80.0, 90.0)
 
 def inventory_hh3c_entity_cpu(info):
     # Debug: lets see how the data we get looks like
