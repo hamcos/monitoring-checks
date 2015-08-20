@@ -17,6 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-perfometers["check_mk-hh3c_entity_cpu"] = perfometer_cpu_utilization
-perfometers["check_mk-hh3c_entity_temp"] = perfometer_temperature
-perfometers["check_mk-hh3c_entity_mem"] = perfometer_simple_mem_usage
+def _hh3c_entity_get_name_for_sensor(nr, ent_physical_descr, module):
+    if ent_physical_descr in ['MODULE LEVEL1']:
+        description = 'module'
+    else:
+        return None
+    return '{} {} {}'.format(nr, description, int(module))

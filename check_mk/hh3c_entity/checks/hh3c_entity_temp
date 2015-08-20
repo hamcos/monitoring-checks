@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# http://h3c.com/portal/Products___Solutions/Technology/System_Management/Configuration_Example/200912/656451_57_0.htm
 # Tested with:
 #   * HP Comware Platform Software, Software Version 5.20.99 Release 2221P02 HP A5120-48G EI Switch with 2 Interface Slots Copyright (c) 2010-2014 Hewlett-Packard Development Company, L.P.
 #   * HP Comware Platform Software, Software Version 5.20.105, Release 1808P25 HP A5820AF-24XG Switch Copyright (c) 2010-2014 Hewlett-Packard Development Company, L.P.
@@ -198,44 +197,38 @@
 
 hh3c_entity_temp_default_levels = (61, 66)
 
-def _hh3c_entity_temp_get_name_for_sensor(ent_physical_descr, module):
+def _hh3c_entity_temp_get_name_for_sensor(nr, ent_physical_descr, module):
     if ent_physical_descr in ['SENSOR']:
-        description = ' module'
+        description = 'module'
     elif ent_physical_descr in ['Temperature Sensor on Board']:
-        description = ' module board'
+        description = 'module board'
     else:
         return None
     # return '{} {}: {}, warn: {}, critical: {}'.format(description, int(module), temp, warn, critical)
-    return '{} {}'.format(description, int(module))
+    return '{} {} {}'.format(nr, description, int(module))
 
 def inventory_hh3c_entity_temp(info):
     # Debug: lets see how the data we get looks like
     # import pprint ; pprint.pprint(info)
 
     module = 1.0
-
-    # for ent_physical_descr, temp, warn, critical in info:
-    for ent_physical_descr, temp in info:
+    for nr, elem in enumerate(info):
+        ent_physical_descr, temp = elem
         temp = int(temp)
-        if temp != 65535:
-            name = _hh3c_entity_temp_get_name_for_sensor(ent_physical_descr, module)
-            if name:
-                # print(name)
-                yield name, 'hh3c_entity_temp_default_levels'
-                module += 0.5
-                ## Occurs two times per module. Different temperatures … See above.
+        name = _hh3c_entity_temp_get_name_for_sensor(nr, ent_physical_descr, module)
+        if temp != 65535 and name:
+            # print(name)
+            yield name, 'hh3c_entity_temp_default_levels'
+
+            module += 0.5
+            ## Occurs two times per module. Different temperatures … See above.
 
 def check_hh3c_entity_temp(item, params, info):
-
-    module = 1.0
-
-    for ent_physical_descr, temp in info:
-        name = _hh3c_entity_temp_get_name_for_sensor(ent_physical_descr, module)
-        print(name)
-        if name and name == item:
-            degree_celsius = int(temp)
+    for nr, elem in enumerate(info):
+        if unicode(item).startswith(unicode(nr) + ' '):
+            ent_physical_descr, temp = elem
+            degree_celsius = float(elem[1])
             return check_temperature(degree_celsius, params)
-            module += 0.5
 
     return (3, "Invalid information in snmp data")
 
@@ -253,5 +246,6 @@ check_info['hh3c_entity_temp'] = {
             # '4.1.25506.2.6.1.1.1.1.17',
         ] ),
     'has_perfdata'          : True,
-    # 'group'                 : 'cpu_utilization',
+    'group'                 : 'temperature',
+    "includes"              : [ 'temperature.include' ],
 }
