@@ -193,6 +193,10 @@
 #  ['M-GigabitEthernet0/0/0', '65535', '0', '0']]
 #
 # Example SNMP values:
+# HH3C-ENTITY-EXT-MIB::hh3cEntityExtTemperature.112 = INTEGER: 53
+# HH3C-ENTITY-EXT-MIB::hh3cEntityExtTemperature.118 = INTEGER: 53
+# HH3C-ENTITY-EXT-MIB::hh3cEntityExtTemperature.121 = INTEGER: 53
+# HH3C-ENTITY-EXT-MIB::hh3cEntityExtTemperature.122 = INTEGER: 51
 
 
 factory_settings['hh3c_entity_temp_default_levels'] = {
