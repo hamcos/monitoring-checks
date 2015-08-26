@@ -55,7 +55,8 @@ else:
         if access_time < time_before:
             volumes_old_snapshot.append('%s: %s' % (volume, datetime.fromtimestamp(access_time).strftime('%Y-%m-%d %H:%M:%S')))
         else:
-            volumes_ok.append(volume)
+            if len(volumes_ok) < 30:
+                volumes_ok.append(volume)
 
     if len(volumes_old_snapshot) != 0:
        exit_status = 1
