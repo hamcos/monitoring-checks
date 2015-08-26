@@ -25,7 +25,7 @@ s.set_transport_type('HTTPS')
 status_detail = 'UNKNOWN - '
 exit_status = 3
 
-output = s.invoke('lun-get-iter')
+output = s.invoke('lun-get-iter', 'max-records', 9999)
 
 if output.results_errno() != 0:
     status_detail += str(output.results_reason())

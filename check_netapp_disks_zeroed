@@ -25,11 +25,14 @@ s.set_transport_type('HTTPS')
 status_detail = 'UNKNOWN - '
 exit_status = 3
 
+## max-records: The default is 2000 for clustered ONTAP.
 output = s.invoke('storage-disk-get-iter')
 
 if output.results_errno() != 0:
     status_detail += str(output.results_reason())
 else:
+
+    # print(output.sprintf())
     zeroed = dict()
     not_zeroed = dict()
 

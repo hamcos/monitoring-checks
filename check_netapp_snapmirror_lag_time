@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+# encoding: utf-8
+# @author Robin Schneider <robin.schneider@hamcos.de>
+# @company hamcos IT Service GmbH http://www.hamcos.de
+# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+#
+# Checks NetApp SnapMirror volume lag time and healthiness.
+#
+# Information on NetApp Release 8.2.1 Cluster-Mode via SNMP not available although documented in NETAPP-MIB as
+# 1.3.6.1.4.1.789.1.9
+
+import sys
+from common import *
+# sys.path.append("/usr/local/lib/python/NetApp/")
+from NaServer import *
+
+args = len(sys.argv) - 1
+if (args < 3):
+    print_usage()
+
+filer    = sys.argv[1]
+user     = sys.argv[2]
+password = sys.argv[3]
+
+warning_lag_time = 1.5*24*3600
+critical_lag_time = 2*24*3600
+if args > 3:
+    warning_lag_time = int(sys.argv[4])
+if args > 4:
+    critical_lag_time = int(sys.argv[5])
+
+
+def get_lag_time_output(destination_location, lag_time):
+    return 'lag time between source and {} is {} ({:.2f} days)'.format(
+            destination_location,
+            lag_time,
+            lag_time / (24*3600),
+        )
+
+s = NaServer(filer, 1, 1)
+s.set_server_type('Filer')
+s.set_admin_user(user, password)
+s.set_transport_type('HTTPS')
+
+status_detail = 'UNKNOWN - '
+exit_status = 3
+
+output = s.invoke('snapmirror-get-iter', 'max-records', 9999)
+
+if output.results_errno() != 0:
+    status_detail += str(output.results_reason())
+else:
+    sm_critical = []
+    sm_warning = []
+    sm_ok = []
+
+    # print(output.sprintf())
+
+    output = output.child_get('attributes-list')
+    for sm_elem in output.children_get():
+        destination_location = sm_elem.child_get_string('destination-location')
+        lag_time = sm_elem.child_get_int('lag-time')
+        is_healthy = sm_elem.child_get_string('is-healthy')
+        # print('target: {}, lag time: {} ({:.2f} days)'.format(destination_location, lag_time, lag_time / (24*3600)))
+
+        if is_healthy != 'true':
+            sm_critical.append('{} is not healthy'.format(destination_location))
+        elif lag_time > critical_lag_time:
+            sm_critical.append(get_lag_time_output(destination_location, lag_time))
+        elif lag_time > warning_lag_time:
+            sm_warning.append(get_lag_time_output(destination_location, lag_time))
+        else:
+            sm_ok.append('{} lag time {}'.format(destination_location, lag_time))
+
+    if len(sm_critical) != 0:
+        exit_status = 2
+        status_detail = "CRIT - SnapMirror volumes with critical problems: {}".format(
+            ', '.join(sm_critical)
+        )
+    elif len(sm_warning) != 0:
+        exit_status = 1
+        status_detail = "WARN - SnapMirror volumes with warnings: {}".format(
+            ', '.join(sm_warning)
+        )
+    elif len(sm_warning) != 0:
+        exit_status = 0
+        status_detail = "OK - All SnapMirror volumes are OK: {}".format(
+            ', '.join(sm_ok)
+        )
+
+print(status_detail)
+sys.exit(exit_status)

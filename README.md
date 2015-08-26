@@ -30,3 +30,7 @@ This plugin checks if all systems use there home interface.
 It depends on https://communities.netapp.com/docs/DOC-1152
 
 [Monitoring Exchange](https://www.monitoringexchange.org/inventory/Check-Plugins/Hardware/Storage/NetApp/check_netapp_snapshot_age)
+
+## check_netapp_snapmirror_lag_time
+Checks NetApp SnapMirror volume lag time and healthiness.
+It depends on https://communities.netapp.com/docs/DOC-1152
