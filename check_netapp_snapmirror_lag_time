@@ -75,17 +75,17 @@ else:
     if len(sm_critical) != 0:
         exit_status = 2
         status_detail = "CRIT - SnapMirror volumes with critical problems: {}".format(
-            ', '.join(sm_critical)
+            ',\n'.join(sm_critical)
         )
     elif len(sm_warning) != 0:
         exit_status = 1
         status_detail = "WARN - SnapMirror volumes with warnings: {}".format(
-            ', '.join(sm_warning)
+            ',\n'.join(sm_warning)
         )
     elif len(sm_ok) != 0:
         exit_status = 0
         status_detail = "OK - All SnapMirror volumes are OK: {}".format(
-            ', '.join(sm_ok)
+            ',\n'.join(sm_ok)
         )
 
 print(status_detail)

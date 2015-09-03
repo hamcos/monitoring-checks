@@ -60,9 +60,9 @@ else:
 
     if len(volumes_old_snapshot) != 0:
        exit_status = 1
-       status_detail = "WARN - Snapshots older than {} days: {}".format(max_age_days, ', '.join(volumes_old_snapshot))
+       status_detail = "WARN - Snapshots older than {} days: {}".format(max_age_days, ',\n'.join(volumes_old_snapshot))
     elif len(volumes_ok) != 0:
-        status_detail = "OK - Snapshots are not older than {} days: {}".format(max_age_days, ', '.join(volumes_ok))
+        status_detail = "OK - Snapshots are not older than {} days: {}".format(max_age_days, ',\n'.join(volumes_ok))
         exit_status = 0
 
 print status_detail
