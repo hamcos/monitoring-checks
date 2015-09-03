@@ -2,68 +2,206 @@
 # encoding: utf-8
 # @author Robin Schneider <robin.schneider@hamcos.de>
 # @company hamcos IT Service GmbH http://www.hamcos.de
-# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+# @license AGPLv3 <https://www.gnu.org/licenses/agpl-3.0.html>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, version 3 of the
+# License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import sys, time
-from common import *
+"""
+Nagios/Icinga check for the snapshots age of a NetApp storage system.
+Additionally, this check can also fed the snapshot number as passive check into
+the core.
+Reasons:
+    1. No better API call available to get a count of all snapshots.
+"""
 
-# sys.path.append("/usr/local/lib/python/NetApp/")
-from NaServer import *
+__version__ = '0.7'
+
+# modules {{{
+# std {{{
+import sys
+import logging
+from time import time
 from datetime import datetime
 
-args = len(sys.argv) - 1
-if (args < 3):
-    print_usage()
+# sys.path.append("/usr/local/lib/python/NetApp/")
+from NaServer import NaServer
+# }}}
 
-filer    = sys.argv[1]
-user     = sys.argv[2]
-password = sys.argv[3]
 
-max_age_days = 1
-if args > 3:
-    max_age_days = int(sys.argv[4])
+def check_netapp_snapshot_age(na_server, max_age_days, max_records=9999):
+    status_detail = "UNKNOWN - "
+    exit_status = 3
 
-cur_time = int(time.time())
-time_before = cur_time - max_age_days*24*60*60
+    cur_time = int(time())
+    time_before = cur_time - max_age_days*24*60*60
 
-s = NaServer(filer, 1, 1)
-s.set_server_type('Filer')
-s.set_admin_user(user, password)
-s.set_transport_type('HTTPS')
+    # FIXME: Handle max-records
+    na_answer = na_server.invoke('snapshot-get-iter', 'max-records', max_records)
 
-status_detail = 'UNKNOWN - '
-exit_status = 3
+    if na_answer.results_errno() != 0:
+        status_detail += str(na_answer.results_reason())
+    else:
+        volumes_old_snapshot = []
+        volumes_ok = []
+        snapshot_count = 0
 
-## FIXME: Handle max-records
-output = s.invoke('snapshot-get-iter', 'max-records', 9999)
+        logging.debug(na_answer.sprintf())
 
-if output.results_errno() != 0:
-    status_detail += str(output.results_reason())
-else:
-    volumes_old_snapshot = []
-    volumes_ok = []
+        elements = na_answer.child_get('attributes-list')
+        for element in elements.children_get():
+            snapshot_count += 1
+            #  name = element.child_get_string('name')
+            volume = element.child_get_string('volume')
+            access_time = int(element.child_get_string('access-time'))
+            # print ', '.join([ volume, name, str(access_time) ])
+            if access_time < time_before:
+                volumes_old_snapshot.append('%s: %s' % (volume, datetime.fromtimestamp(access_time).strftime('%Y-%m-%d %H:%M:%S')))
+            else:
+                if len(volumes_ok) < 30:
+                    volumes_ok.append(volume)
 
-    # print(output.sprintf())
+        if len(volumes_old_snapshot) != 0:
+            exit_status = 1
+            status_detail = "WARN - Snapshots older than {} days: {}".format(max_age_days, ',\n'.join(volumes_old_snapshot))
+        elif len(volumes_ok) != 0:
+            status_detail = "OK - Snapshots are not older than {} days: {}".format(max_age_days, ',\n'.join(volumes_ok))
+            exit_status = 0
 
-    output = output.child_get('attributes-list')
-    # print output.sprintf()
-    for i in output.children_get():
-        name = i.child_get_string('name')
-        volume = i.child_get_string('volume')
-        access_time = int(i.child_get_string('access-time'))
-        # print ', '.join([ volume, name, str(access_time) ])
-        if access_time < time_before:
-            volumes_old_snapshot.append('%s: %s' % (volume, datetime.fromtimestamp(access_time).strftime('%Y-%m-%d %H:%M:%S')))
+    return {
+        'exit_status': exit_status,
+        'status_detail': status_detail,
+        'snapshot_count': snapshot_count,
+    }
+
+
+# main {{{
+if __name__ == '__main__':
+
+    from argparse import ArgumentParser
+
+    args_parser = ArgumentParser(
+        description=__doc__,
+    )
+    args_parser.add_argument(
+        '-V', '--version',
+        action='version',
+        version='%(prog)s {version}'.format(version=__version__)
+    )
+    args_parser.add_argument(
+        '-d', '--debug',
+        help="Print lots of debugging statements",
+        action="store_const", dest="loglevel", const=logging.DEBUG,
+        default=logging.WARNING,
+    )
+    args_parser.add_argument(
+        '-v', '--verbose',
+        help="Be verbose",
+        action="store_const", dest="loglevel", const=logging.INFO,
+    )
+    args_parser.add_argument(
+        'hostname',
+    )
+    args_parser.add_argument(
+        'user',
+    )
+    args_parser.add_argument(
+        'password',
+    )
+    args_parser.add_argument(
+        '-m', '--max-age-days',
+        help="Maximum age of a snapshot."
+        " If the snapshot is older then the value specified, a warning will be produced."
+        " Default: %(default)s",
+        default=1,
+    )
+    args_parser.add_argument(
+        '-c', '--command-file',
+        help="Command file/socket of the core."
+        " Used to fed passive checks into the core."
+        " Default: %(default)s",
+        default='/var/lib/icinga/rw/icinga.cmd',
+    )
+    args_parser.add_argument(
+        '-W', '--warn-num-snapshots',
+        help="Warn if more then the given number of snapshots exist."
+        " Default: %(default)s",
+        default=150,
+    )
+    args_parser.add_argument(
+        '-C', '--critical-num-snapshots',
+        help="Critical event if more then the given number of snapshots exist."
+        " Default: %(default)s",
+        default=170,
+    )
+    args_parser.add_argument(
+        '-n', '--snapshot-count-service',
+        help="Service description of the passively fed snapshot count service."
+        " This feature is only active if a name was given."
+        " Default: %(default)s",
+    )
+    args_parser.add_argument(
+        '-r', '--max-records',
+        help="Maximum number of snapshots to request from the Filer."
+        " If this number is to low, you might miss snapshots."
+        " Default: %(default)s",
+        default=9999,
+    )
+    args = args_parser.parse_args()
+    logger = logging.getLogger(__file__)
+    logging.basicConfig(
+        format='%(levelname)s: %(message)s',
+        level=args.loglevel,
+    )
+
+    na_server = NaServer(args.hostname, 1, 1)
+    na_server.set_server_type('Filer')
+    na_server.set_admin_user(args.user, args.password)
+    na_server.set_transport_type('HTTPS')
+
+    result = check_netapp_snapshot_age(
+        na_server,
+        args.max_age_days,
+        max_records=args.max_records,
+    )
+
+    if args.snapshot_count_service:
+        warn = int(args.warn_num_snapshots)
+        critical = int(args.critical_num_snapshots)
+        status_detail = "UNKNOWN - "
+        exit_status = 3
+        if args.critical_num_snapshots and result['snapshot_count'] > critical:
+            exit_status = 2
+            status_detail = 'CRIT - Number of snapshots is {}'.format(result['snapshot_count'])
+        elif args.warn_num_snapshots and result['snapshot_count'] > warn:
+            exit_status = 1
+            status_detail = 'WARN - Number of snapshots is {}'.format(result['snapshot_count'])
         else:
-            if len(volumes_ok) < 30:
-                volumes_ok.append(volume)
+            exit_status = 0
+            status_detail = 'OK - Number of snapshots is {}'.format(result['snapshot_count'])
+        count_file = open(args.command_file, 'a')
+        count_file.write(
+            '[{}] PROCESS_SERVICE_CHECK_RESULT;{};{};{};{}\n'.format(
+                int(time()),
+                args.hostname,
+                args.snapshot_count_service,
+                exit_status,
+                status_detail,
+            )
+        )
+        count_file.close()
 
-    if len(volumes_old_snapshot) != 0:
-       exit_status = 1
-       status_detail = "WARN - Snapshots older than {} days: {}".format(max_age_days, ',\n'.join(volumes_old_snapshot))
-    elif len(volumes_ok) != 0:
-        status_detail = "OK - Snapshots are not older than {} days: {}".format(max_age_days, ',\n'.join(volumes_ok))
-        exit_status = 0
+    print(result['status_detail'])
+    sys.exit(result['exit_status'])
 
-print status_detail
-sys.exit(exit_status)
+# }}}
