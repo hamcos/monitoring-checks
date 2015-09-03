@@ -82,7 +82,7 @@ else:
         status_detail = "WARN - SnapMirror volumes with warnings: {}".format(
             ', '.join(sm_warning)
         )
-    elif len(sm_warning) != 0:
+    elif len(sm_ok) != 0:
         exit_status = 0
         status_detail = "OK - All SnapMirror volumes are OK: {}".format(
             ', '.join(sm_ok)
