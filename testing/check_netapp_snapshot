@@ -50,10 +50,11 @@ def check_netapp_snapshot_age(na_server, max_age_days, max_records=9999):
     while next_tag:
         query = NaElement('snapshot-get-iter')
         query.child_add_string('max-records', max_records)
-        if next_tag and type(next_tag) == str:
+        if next_tag and type(next_tag) in [ unicode, str ]:
             logging.info('next-tag')
             query.child_add_string('next-tag', next_tag)
 
+        logging.info(query.sprintf())
         na_answer = na_server.invoke_elem(query)
 
         if na_answer.results_errno() != 0:
