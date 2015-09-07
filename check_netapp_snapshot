@@ -109,9 +109,9 @@ def check_netapp_snapshot_age(
 
             if len(volumes_old_snapshot) != 0:
                 exit_status = 1
-                status_detail = "WARN - Snapshots older than {} days: {}".format(max_age_days, ',\n'.join(volumes_old_snapshot))
+                status_detail = "WARN - Snapshots older than {} days: {}".format(max_age_days, ',\\n'.join(volumes_old_snapshot))
             elif len(volumes_ok) != 0:
-                status_detail = "OK - Snapshots are not older than {} days: {}".format(max_age_days, ',\n'.join(volumes_ok))
+                status_detail = "OK - Snapshots are not older than {} days: {}".format(max_age_days, ',\\n'.join(volumes_ok))
                 exit_status = 0
 
             next_tag = na_answer.child_get_string('next-tag')
@@ -253,17 +253,17 @@ if __name__ == '__main__':
         if len(critical_snapshot_count) != 0:
             exit_status = 2
             status_detail = "CRIT - The following volumes have too many snapshots: {}".format(
-                ',\n'.join(critical_snapshot_count),
+                ',\\n'.join(critical_snapshot_count),
             )
         elif len(warn_snapshot_count) != 0:
             exit_status = 1
             status_detail = "WARN - The following volumes have too many snapshots: {}".format(
-                ',\n'.join(warn_snapshot_count),
+                ',\\n'.join(warn_snapshot_count),
             )
         elif len(ok_snapshot_count) != 0:
             exit_status = 0
             status_detail = "OK - The number of snapshots per volume is OK for all volumes: {}".format(
-                ',\n'.join(ok_snapshot_count),
+                ',\\n'.join(ok_snapshot_count),
             )
 
         count_file = open(args.command_file, 'a')

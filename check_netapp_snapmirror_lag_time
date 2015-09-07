@@ -63,7 +63,10 @@ else:
         is_healthy = sm_elem.child_get_string('is-healthy')
         # print('target: {}, lag time: {} ({:.2f} days)'.format(destination_location, lag_time, lag_time / (24*3600)))
 
-        if is_healthy != 'true':
+
+        if destination_location == 'wedert_cl2_svm02:sm_wedert_cl1_svm02_vmware_iso_001' and lag_time < 10*24*3600:
+            sm_ok.append('{} lag time {}'.format(destination_location, lag_time))
+        elif is_healthy != 'true':
             sm_critical.append('{} is not healthy'.format(destination_location))
         elif lag_time > critical_lag_time:
             sm_critical.append(get_lag_time_output(destination_location, lag_time))

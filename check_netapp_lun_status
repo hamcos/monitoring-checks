@@ -42,9 +42,9 @@ else :
             offline.append(volume_name)
     if len(offline) != 0:
        exit_status = 1
-       status_detail = "WARN - {}".format(',\n'.join(offline))
+       status_detail = "WARN - {}".format(',\\n'.join(offline))
     elif len(online) != 0:
-       status_detail = "OK - online: {}".format(',\n'.join(online))
+       status_detail = "OK - online: {}".format(',\\n'.join(online))
        exit_status = 0
     else:
        status_detail += "No LUNs found."
