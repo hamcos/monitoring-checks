@@ -2,7 +2,7 @@
 # encoding: utf-8
 # @author Robin Schneider <robin.schneider@hamcos.de>
 # @company hamcos IT Service GmbH http://www.hamcos.de
-# @licence GPLv3+ <http://www.gnu.org/licenses/gpl.html>
+# @license GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
 #
 # Checks NetApp SnapMirror volume lag time and healthiness.
 #
