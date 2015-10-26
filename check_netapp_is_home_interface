@@ -54,7 +54,7 @@ else:
     if len(not_home) != 0:
        exit_status = 1
        status_detail = "WARN - The following systems do not work with there home ports: {}".format(
-           ['{}: {},\\n'.format(info, home[info]) for info in not_home]
+           ['{}: {},\\n'.format(info, not_home[info]) for info in not_home]
        )
     elif len(home) != 0:
        status_detail = "OK - All systems are using there home port: {}".format(
