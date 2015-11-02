@@ -14,9 +14,9 @@ It depends on https://communities.netapp.com/docs/DOC-1152
 [Monitoring Exchange](https://www.monitoringexchange.org/inventory/Check-Plugins/Hardware/Storage/NetApp/check_netapp_disks_zeroed)
 
 ## check_netapp_snapshot
-Nagios/Icinga check for the snapshots age of a NetApp storage system.
-Additionally, this check can also fed the snapshot number as passive check into
-the core.
+Nagios/Icinga check for the snapshot age of a NetApp storage system.
+Additionally, this check can also fed the number of snapshots per volume as
+passive check into the core.
 It depends on https://communities.netapp.com/docs/DOC-1152
 
 ## check_netapp_lun_status
