@@ -1,3 +1,6 @@
 [submodule "submodules/Get-DAGHealth"]
 	path = submodules/Get-DAGHealth
 	url = hamcos.github.com:hamcos/Get-DAGHealth.ps1.git
+[submodule "submodules/Check_MK-Things"]
+	path = submodules/Check_MK-Things
+	url = https://github.com/Yogibaer75/Check_MK-Things.git
