@@ -1,0 +1,14 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use autodie;
+use feature qw(say);
+use utf8;
+use open qw(:std :utf8);
+binmode STDOUT, ':encoding(UTF-8)';
+
+open(my $fh, ">", 'log');
+foreach (@ARGV) {
+    say { $fh } $_;
+    say;
+}

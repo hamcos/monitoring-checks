@@ -1,0 +1,88 @@
+
+
+
+esx-host-cpu-usage -> hyperv-host-cpu-usage  # In percent overall
+
+esx-host-disk-io -> hyperv-host-disk-io  # IOs per second # Phys? Log?
+
+esx-host-health -> Not implemented (no easy way: no standardized hardware info available)
+
+esx-host-memory -> hyperv-host-memory  # [usage %]
+
+esx-host-mpath-state -> hyperv-host-nic-state  # OK = all ok, WARNING= 1 NOK, CRIT = Rest
+
+esx-host-state -> Not implemented (no easy way: only counters available)
+
+esx-host-vmfs -> Not implemented (no easy way: iSCSI devices to check)
+
+esx-host-vmlist -> Not implemented (no easy way: only counters available)
+
+hyperv-host-mem-dynamic-wanted  # In percent
+
+hyperv-host-swap-pages  # Per second
+ 
+Output in general: "OK - 67%" 
+
+## https://msdn.microsoft.com/en-us/library/cc768535%28v=bts.10%29.aspx#Anchor_3
+echo -n 'check-hyperv-host-cpu-usage: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Hyper-V Hypervisor Logical Processor(_Total)\% Total Run Time'  -w 60 -c 90
+echo $?
+
+## https://msdn.microsoft.com/en-us/library/cc768535%28v=bts.10%29.aspx#Anchor_1
+echo -n 'check-hyperv-host-free-mem-MiB: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Memory\Available Mbytes' -w 5000 -c 2000
+echo $?
+
+## https://msdn.microsoft.com/en-us/library/cc768535%28v=bts.10%29.aspx#Anchor_1
+## http://www.mcseboard.de/topic/205213-performance-counter-f%C3%BCr-speicherauslastung/
+echo -n 'check-hyperv-host-mem-dynamic-wanted-in-precent: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Hyper-V Dynamic Memory Balancer(*)\Average Pressure' -w 95 -c 100
+echo $?
+
+## https://msdn.microsoft.com/en-us/library/cc768535%28v=bts.10%29.aspx#Anchor_1
+echo -n 'check-hyperv-host-swap-pages: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Memory\Pages/sec' -w 500 -c 1000
+echo $?
+
+echo "Use appropriate iSCSI counters"
+## http://blogs.technet.com/b/askperf/archive/2010/12/03/performance-counter-for-iscsi.aspx
+echo -n 'check-hyperv-host-disk-phy-iops: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l 'iSCIS Request Processing Time(*)\*'
+echo $?
+
+echo -n 'check-hyperv-host-disk-logic-iops: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\LogicalDisk(*)\Disk Transfers/sec'
+echo -n 'check-hyperv-host-disk-phy-iops: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\PhysicalDisk(*)\Disk Transfers/sec'
+
+
+echo -n 'check-hyperv-host-heartbeats: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Cluster NetFt Heartbeats\Missing heartbeats'
+
+# exit 0
+## Not plausable
+
+exit 1
+
+
+## Not available?
+## https://msdn.microsoft.com/en-us/library/cc768535%28v=bts.10%29.aspx#Anchor_0
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Logical Disk(*)\Avg. sec/Read'
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Logical Disk(*)\Avg. sec/Write'
+
+
+## Not enabled because it is not sure what Healthy says about a VM.
+
+## From PAL: pal.codeplex.com
+echo -n 'check-hyperv-vms-with-critical-health: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Hyper-V Virtual Machine Health Summary\Health Critical' -w 1 -c 2
+echo $?
+
+echo -n 'check-hyperv-vms-with-ok-health: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Hyper-V Virtual Machine Health Summary\Health OK' -w 100 -c 200
+echo $?
+
+## http://windowsitpro.com/hyper-v/hyper-v-performance-counters
+echo -n 'check-hyperv-host-virtual-cpu-usage: '
+$USER1$/check_nt -H $HOSTADDRESS$ -s $USER13$ -p 12489 -v COUNTER -l '\Hyper-V Hypervisor Virtual Processor(_Total)\% Total Run Time'  -w 60 -c 90
+echo $?

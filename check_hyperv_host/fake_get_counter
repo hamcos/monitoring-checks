@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if [ $# -lt 3 ]; then
+	echo "Usage: $0 <stdout> <stderr> <exit_code>" 1>&2
+	exit 3
+fi
+
+stdout="$1"   ; shift
+stderr="$1"   ; shift
+exit_code="$1"; shift
+
+test -n "$stdout" && echo "$stdout"
+test -n "$stderr" && echo "$stderr" 1>&2
+exit "$exit_code"

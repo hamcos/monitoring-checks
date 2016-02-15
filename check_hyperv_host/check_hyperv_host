@@ -1,0 +1,244 @@
+#!/usr/bin/env perl
+#
+## @author Robin Schneider <ypid@riseup.net>
+## @company hamcos IT Service GmbH http://www.hamcos.de
+## @license AGPLv3 <https://www.gnu.org/licenses/agpl-3.0.html>
+
+# Preamble {{{
+use strict;
+use warnings;
+use autodie;
+use feature qw(say);
+use utf8;
+use open qw(:std :utf8);
+binmode STDOUT, ':encoding(UTF-8)';
+use Scalar::Util qw(looks_like_number);
+
+use Monitoring::Plugin;
+use Capture::Tiny qw(capture);
+## cpan Monitoring::Plugin Capture::Tiny
+# }}}
+
+use version; our $VERSION = qv('0.9.0');
+
+## Check definitions {{{
+my %supported_check_modes = (
+    check_nt   => 1,
+    check_nrpe => 1,
+);
+my %checks = (
+    'cpu-usage' => {
+        counter  => '\Hyper-V Hypervisor Logical Processor(_Total)\% Total Run Time',
+        minimum  => 0,
+        warning  => 60,
+        critical => 90,
+        maximum  => 100,
+        message  => '%d %s (Average utilization of all CPU cores)',
+        unit     => q{%},
+    },
+
+    # 'memory' => {
+    #     counter => '\Memory\Available Mbytes',
+    #     warning => 2000,
+    #     critical => 5000,
+    #     message => 'Free memory: %d MiB',
+    # },
+    'disk-io' => {
+        counter => '\PhysicalDisk(*)\Disk Transfers/sec',
+        message => '%d %s (Disk IO operations)',
+        unit    => 'IOPS',
+    },
+    'swap-pages' => {
+        counter  => '\Memory\Pages/sec',
+        minimum  => 0,
+        warning  => 500,
+        critical => 1000,
+        message  => '%d %s (Swapped in/out pages per second)',
+        unit     => 'swpps',
+    },
+    'mem-dynamic-wanted' => {
+        counter  => '\Hyper-V Dynamic Memory Balancer(*)\Average Pressure',
+        minimum  => 0,
+        warning  => 95,
+        critical => 100,
+        message  => '%d %s (Wanted memory by VMs)',
+# . ' This gives you a very simple view of the overall memory allocation of your system.'
+# . ' As long as this counter is under 100, there is enough memory in your system to service your virtual machines.'
+# . ' Ideally this value should be at 80 or lower.'
+# . ' The closer this gets to 100, the closer you are to running out of memory.'
+# . ' Once this number goes over 100 then you can pretty much guarantee that you have virtual machines that are paging in the guest operating system.',
+        unit => q{%},
+    },
+    'vm-health-critical' => {
+        counter  => '\Hyper-V Virtual Machine Health Summary\Health Critical',
+        minimum  => 0,
+        warning  => 0,
+        critical => 1,
+        message  => '%d %s (Number of unhealthy VMs)',
+        unit     => 'VMs',
+    },
+    'vm-health-ok' => {
+        counter => '\Hyper-V Virtual Machine Health Summary\Health OK',
+        minimum => 0,
+        warning => 1000,
+        message => '%d %s (Number of healthy VMs)',
+        unit    => 'VMs',
+    },
+);
+## }}}
+
+## Command-line arguments {{{
+my $np = Monitoring::Plugin->new(
+    usage =>
+'Usage: %s [-C|--check <check>] [ -c|--critical=<threshold> ] [ -w|--warning=<threshold> ] -- $USER2$/get_counter [-H <host>] [get_counter parameters]',
+    blurb => 'Check Hyper-V counters using the NSClient++.',
+
+    # extra   => '',
+    # url     => '',
+    timeout   => 45,
+    shortname => 'HYPERV',
+    version   => $VERSION,
+    license   => <<'EOF'
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, version 3 of the
+License.
+EOF
+);
+
+$np->add_arg(
+    spec     => 'check|C=s',
+    help     => "Which check to execute." . " Possible values: " . join( ', ', sort keys %checks ),
+    required => 1,
+);
+$np->add_arg(
+    spec    => 'warning|w=s',
+    help    => '-w, --warning=INTEGER:INTEGER warning level (check specifiy default)',
+    default => undef,
+);
+
+$np->add_arg(
+    spec    => 'critical|c=s',
+    help    => '-c, --critical=INTEGER:INTEGER critical level (check specifiy default)',
+    default => undef,
+);
+$np->add_arg(
+    spec => 'type|T=s',
+    help => '-T, --type Which type the get_counter program is expected to return.'
+        . ' Supported: '
+        . join( ', ', sort keys %supported_check_modes ),
+    default => 'check_nrpe',
+);
+$np->getopts;
+
+## }}}
+
+alarm $np->opts->timeout;
+
+## Error checking {{{
+if ( scalar @ARGV < 1 ) {
+    $np->plugin_die('You need to supply a command to retrive the counter(s).');
+}
+
+unless ( exists $checks{ $np->opts->check } ) {
+    $np->plugin_die( $np->opts->check . ' is currently not supported.' );
+}
+
+unless ( $supported_check_modes{ $np->opts->type } ) {
+    $np->plugin_die( 'Type ' . $np->opts->type . ' is currently not supported.' );
+}
+## }}}
+
+## Default levels {{{
+my $check_def = $checks{ $np->opts->check };
+for my $level (qw(warning critical)) {
+    if ( exists $check_def->{$level} ) {
+        unless ( defined $np->opts->{$level} ) {
+            $np->opts->{$level} = $check_def->{$level};
+        }
+    }
+    if ( $np->opts->verbose >= 2 ) {
+        say "$level level: " . ( $check_def->{$level} || 'none' );
+    }
+}
+## }}}
+
+## Get counter value {{{
+my @cmd = @ARGV;
+unless ( -x $cmd[0] ) {
+    $np->plugin_die("'$cmd[0]' is not executable.");
+}
+if ( $np->opts->type eq 'check_nrpe' ) {
+    push( @cmd, qw{ -c CheckCounter -a ShowAll=long} );
+    push( @cmd, 'Counter=' . $check_def->{counter} );
+}
+elsif ( $np->opts->type eq 'check_nt' ) {
+    push( @cmd, qw{-v COUNTER -l} );
+    push( @cmd, $check_def->{counter} );
+}
+
+if ( $np->opts->verbose ) {
+    say "Command: @cmd";
+}
+
+my ( $value, $stderr, $return ) = capture {
+    system(@cmd);
+};
+## }}}
+
+## Check command output/return code {{{
+if ( $return != 0 ) {
+    $np->plugin_die("'$cmd[0]' exited with a non-zero return code: $return");
+}
+if ( scalar $stderr ) {
+    $np->plugin_die("'$cmd[0]' wrote the following message to STDERR: $stderr");
+}
+if ( $np->opts->type eq 'check_nrpe' ) {
+    my $escaped_counter = quotemeta $check_def->{counter};
+    unless ( $value =~ m/^OK:\s+$escaped_counter:\s+(?<value>[\d.]+)\|?/xms ) {
+        $np->plugin_die("Wanted counter value ($check_def->{counter}) could not be extracted from output: $value");
+    }
+    $value = $+{value};
+}
+if ( not looks_like_number($value) ) {
+    $np->plugin_die("'$cmd[0]' returned a counter which is not a number: $value");
+}
+## }}}
+
+## Prefdata {{{
+$np->add_perfdata(
+    label    => $np->opts->check,
+    value    => $value,
+    uom      => $check_def->{unit},
+    warning  => $np->opts->{warning},
+    critical => $np->opts->{critical},
+    min      => exists $check_def->{minimum} ? $check_def->{minimum} : undef,
+    max      => exists $check_def->{maximum} ? $check_def->{maximum} : undef,
+);
+## }}}
+
+## Ensure that value is in the expected range {{{
+if ( exists $check_def->{minimum} and $value < $check_def->{minimum} ) {
+    $np->plugin_die(
+        "Value is less than the expected minimum for this counter: (value: $value, minimum: $check_def->{minimum})");
+}
+if ( exists $check_def->{maximum} and $value > $check_def->{maximum} ) {
+    $np->plugin_die(
+        "Value is greater than the expected maximum for this counter: (value: $value, maximum $check_def->{maximum})");
+}
+## }}}
+
+## Format message {{{
+my $message =
+      sprintf( $check_def->{message}, $value, $check_def->{unit} )
+    . " ([Minimum:]Warning/Critical[:Maximum] at: "
+    . ( exists $check_def->{minimum} ? $check_def->{minimum} . q{:} : q{} )
+    . ( $np->opts->{warning}  || 'none' ) . q{/}
+    . ( $np->opts->{critical} || 'none' )
+    . ( exists $check_def->{maximum} ? q{:} . $check_def->{maximum} : q{} ) . ")";
+## }}}
+
+$np->plugin_exit(
+    return_code => $np->check_threshold($value),
+    message     => $message,
+);
