@@ -10,7 +10,7 @@ Additionally, this check can also fed the number of snapshots per volume as
 passive check into the core.
 """
 
-__version__ = '0.7'
+__version__ = '0.8'
 
 # modules {{{
 # std {{{
@@ -25,6 +25,20 @@ from NaServer import NaServer, NaElement
 # }}}
 
 
+def get_human_readable_date(unix_time):
+    return datetime.fromtimestamp(unix_time).strftime('%Y-%m-%d %H:%M:%S')
+
+
+def get_human_readable_volume_info(volume_name, volume_info):
+    return "{} with oldest snapshot: {} ({})".format(
+        volume_name,
+        volume_info[volume_name]['oldest']['snapshot_name'],
+        get_human_readable_date(
+            volume_info[volume_name]['oldest']['access_time']
+        ),
+    )
+
+
 def check_netapp_snapshot_age(
         na_server,
         max_age_days,
@@ -34,10 +48,12 @@ def check_netapp_snapshot_age(
 
     status_detail = "UNKNOWN - "
     exit_status = 3
-    snapshot_count_per_volume = dict()
+
+    volume_info = dict()
+    volumes_old_snapshot = set()
+    volumes_ok = set()
 
     cur_time = int(time())
-    time_before = cur_time - max_age_days*24*60*60
 
     next_tag = False
 
@@ -73,43 +89,69 @@ def check_netapp_snapshot_age(
         if na_answer.results_errno() != 0:
             status_detail += str(na_answer.results_reason())
         else:
-            volumes_old_snapshot = []
-            volumes_ok = []
 
             logging.debug(na_answer.sprintf())
 
             elements = na_answer.child_get('attributes-list')
             for element in elements.children_get():
-                name = element.child_get_string('name')
-                volume = element.child_get_string('volume')
+                snapshot_name = element.child_get_string('name')
+                volume_name = element.child_get_string('volume')
                 access_time = int(element.child_get_string('access-time'))
                 total_snapshot_count += 1
-                if volume in snapshot_count_per_volume:
-                    snapshot_count_per_volume[volume] += 1
+                if volume_name in volume_info:
+                    volume_info[volume_name]['names'].append(snapshot_name)
+                    if access_time < volume_info[volume_name]['oldest']['access_time']:
+                        volume_info[volume_name]['oldest'] = {
+                            'snapshot_name': snapshot_name,
+                            'access_time': access_time,
+                        }
                 else:
-                    snapshot_count_per_volume[volume] = 1
-                logging.info('{}: {}'.format(volume, name, str(access_time)))
-                if access_time < time_before:
-                    volumes_old_snapshot.append('%s: %s' % (volume, datetime.fromtimestamp(access_time).strftime('%Y-%m-%d %H:%M:%S')))
+                    volume_info[volume_name] = {
+                        'names': [ snapshot_name ],
+                        'oldest': {
+                            'snapshot_name': snapshot_name,
+                            'access_time': access_time,
+                        },
+                    }
+                logging.info(u'{}: {} ({})'.format(
+                    volume_name,
+                    snapshot_name,
+                    get_human_readable_date(access_time),
+                ))
+                if (cur_time - max_age_days*24*60*60) < access_time:
+                    volumes_ok.add(volume_name)
                 else:
-                    volumes_ok.append(volume)
-
-            if len(volumes_old_snapshot) != 0:
-                exit_status = 1
-                status_detail = "WARN - Snapshots older than {} days: {}".format(max_age_days, ',\\n'.join(volumes_old_snapshot))
-            elif len(volumes_ok) != 0:
-                status_detail = "OK - Snapshots are not older than {} days: {}".format(max_age_days, ',\\n'.join(volumes_ok))
-                exit_status = 0
+                    volumes_old_snapshot.add(volume_name)
 
             next_tag = na_answer.child_get_string('next-tag')
 
             if abort_after is not None and total_snapshot_count >= abort_after:
                 break
 
+    if len(volumes_old_snapshot) != 0:
+        exit_status = 1
+        status_detail = "WARN - Snapshots older than {} days: {}".format(
+            max_age_days,
+            ',\\n'.join(map(
+                lambda volume_name: get_human_readable_volume_info(volume_name, volume_info),
+                volumes_old_snapshot,
+            )),
+        )
+    elif len(volumes_ok) != 0:
+        status_detail = "OK - Snapshots are not older than {} days: {}".format(
+            max_age_days,
+            ',\\n'.join(map(
+                lambda volume_name: get_human_readable_volume_info(volume_name, volume_info),
+                volumes_ok,
+            )),
+        )
+        exit_status = 0
+    logging.debug(u"volumes_ok: " + unicode(volumes_ok))
+
     return {
         'exit_status': exit_status,
         'status_detail': status_detail,
-        'snapshot_count_per_volume': snapshot_count_per_volume,
+        'volume_info': volume_info,
     }
 
 
@@ -227,13 +269,14 @@ if __name__ == '__main__':
         warn_snapshot_count = []
         ok_snapshot_count = []
 
-        for volume, snapshot_count in result['snapshot_count_per_volume'].iteritems():
+        for volume_name, volume_item in result['volume_info'].iteritems():
+            snapshot_count = len(volume_item['names'])
             if args.critical_num_snapshots and  snapshot_count > critical:
-                critical_snapshot_count.append('{} has {} snapshots'.format( volume, snapshot_count))
+                critical_snapshot_count.append('{} has {} snapshots'.format( volume_name, snapshot_count))
             elif args.warn_num_snapshots and snapshot_count > warn:
-                warn_snapshot_count.append('{} has {} snapshots'.format( volume, snapshot_count))
+                warn_snapshot_count.append('{} has {} snapshots'.format( volume_name, snapshot_count))
             else:
-                ok_snapshot_count.append('{} has {} snapshots'.format( volume, snapshot_count))
+                ok_snapshot_count.append('{} has {} snapshots'.format( volume_name, snapshot_count))
 
         status_detail = "UNKNOWN - "
         exit_status = 3
@@ -265,8 +308,10 @@ if __name__ == '__main__':
         )
         count_file.close()
 
+        logging.info(status_detail)
+
     print(result['status_detail'])
-    logging.info("Snapshot count is {}.".format(result['snapshot_count_per_volume']))
+    logging.info("Snapshot count is {}.".format(result['volume_info']))
     sys.exit(result['exit_status'])
 
 # }}}
