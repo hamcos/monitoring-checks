@@ -8,6 +8,8 @@
 #
 # Information on NetApp Release 8.2.1 Cluster-Mode via SNMP not available although documented in NETAPP-MIB as
 # 1.3.6.1.4.1.789.1.9
+#
+# Deprecated: Use https://github.com/ypid-bot/check_mk/blob/master/agents/special/agent_netapp
 
 import sys
 from common import *
@@ -59,7 +61,10 @@ else:
     output = output.child_get('attributes-list')
     for sm_elem in output.children_get():
         destination_location = sm_elem.child_get_string('destination-location')
-        lag_time = sm_elem.child_get_int('lag-time')
+        lag_time = sm_elem.child_get_string('lag-time')
+        if not lag_time:
+            continue
+        lag_time = int(lag_time)
         is_healthy = sm_elem.child_get_string('is-healthy')
         # print('target: {}, lag time: {} ({:.2f} days)'.format(destination_location, lag_time, lag_time / (24*3600)))
 
