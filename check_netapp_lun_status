@@ -3,6 +3,8 @@
 # @author Robin Schneider <robin.schneider@hamcos.de>
 # @company hamcos IT Service GmbH http://www.hamcos.de
 # @license GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+#
+# Deprecated: Use https://github.com/ypid-bot/check_mk/blob/master/agents/special/agent_netapp
 
 import sys
 from common import *
