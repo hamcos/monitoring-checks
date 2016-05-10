@@ -37,29 +37,61 @@ else:
     not_zeroed = dict()
 
     output = output.child_get('attributes-list')
-    for i in output.children_get():
-        disk_name = i.child_get_string('disk-name')
-        disk_info = i.child_get('disk-raid-info')
+    for disk_item in output.children_get():
+
+        disk_name = disk_item.child_get_string('disk-name')
+        disk_info = disk_item.child_get('disk-raid-info')
         spare_pool = disk_info.child_get_string('spare-pool')
-        disk_spare_info = disk_info.child_get('disk-spare-info')
-        if disk_spare_info:
+        container_type = disk_info.child_get_string('container-type')
+
+        if 'aggregate' == container_type:
+            # Not a spare disk.
+            continue
+
+        elif 'spare' == container_type:
+            disk_spare_info = disk_info.child_get('disk-spare-info')
+
             zeroed_bool_string = disk_spare_info.child_get_string('is-zeroed')
-            if zeroed_bool_string == 'true':
+            is_zeroing_bool_string = disk_spare_info.child_get_string('is-zeroing')
+
+        elif 'shared' == container_type:
+            disk_shared_info = disk_info.child_get('disk-shared-info')
+
+            if disk_shared_info.child_get('aggregate-list'):
+                # Not a spare disk.
+                continue
+
+            zeroed_bool_string = disk_shared_info.child_get_string('is-zeroed')
+            is_zeroing_bool_string = disk_shared_info.child_get_string('is-zeroing')
+
+        else:
+            # Unhandled case.
+            sys.exit(exit_status)
+
+        if zeroed_bool_string and is_zeroing_bool_string:
+            disk_string = '{}{}'.format(
+                disk_name,
+                ' (currently zeroing)' if is_zeroing_bool_string == 'true' else '',
+            )
+            if zeroed_bool_string == 'true' and is_zeroing_bool_string == 'false':
                 if spare_pool not in zeroed.keys():
                     zeroed[spare_pool] = []
-                zeroed[spare_pool].append(disk_name)
+                zeroed[spare_pool].append(disk_string)
             else:
                 if spare_pool not in not_zeroed.keys():
                     not_zeroed[spare_pool] = []
-                not_zeroed[spare_pool].append(disk_name)
+                not_zeroed[spare_pool].append(disk_string)
+        else:
+            sys.exit(exit_status)
+
     if len(not_zeroed) != 0:
        exit_status = 1
-       status_detail = "WARN - not zeroed: {}".format(not_zeroed)
+       status_detail = "WARN - not zeroed spare disks: {}".format(not_zeroed)
     elif len(zeroed) != 0:
-       status_detail = "OK - zeroed: {}".format(zeroed)
+       status_detail = "OK - zeroed spare disks: {}".format(zeroed)
        exit_status = 0
     else:
-       status_detail += "No disks in a spare group found."
+       status_detail += "No spare disks found."
 
 print status_detail
 sys.exit(exit_status)

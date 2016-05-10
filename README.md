@@ -8,7 +8,7 @@ This plugin checks if there are SMS in the incoming directory. This can be usefu
 [Monitoring Exchange](https://www.monitoringexchange.org/inventory/Check-Plugins/Hardware/Devices/Misc/check_incomingSMS)
 
 ## check_netapp_disks_zeroed
-This plugin checks if there are disks which are not zeroed over the ZAPI from NetApp.
+This plugin checks if there are spare disks which are not zeroed over the ZAPI from NetApp.
 It depends on https://communities.netapp.com/docs/DOC-1152
 
 [Monitoring Exchange](https://www.monitoringexchange.org/inventory/Check-Plugins/Hardware/Storage/NetApp/check_netapp_disks_zeroed)
