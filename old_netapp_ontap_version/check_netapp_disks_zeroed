@@ -2,7 +2,7 @@
 # encoding: utf-8
 # @author Robin Schneider <robin.schneider@hamcos.de>
 # @company hamcos IT Service GmbH http://www.hamcos.de
-# @license GPLv2 <https://www.gnu.org/licenses/gpl-2.0.html>
+# @license GPL-2.0 <https://www.gnu.org/licenses/gpl-2.0.html>
 # @repo https://github.com/hamcos/monitoring-checks
 # This plugin checks if there are disks which are not zeroed over the ZAPI from NetApp.
 # It depends on https://communities.netapp.com/docs/DOC-1152
