@@ -65,18 +65,19 @@ else:
         if not lag_time:
             continue
         lag_time = int(lag_time)
+        lag_time_in_days = '{:.3f} days'.format(lag_time / (24*3600))
         is_healthy = sm_elem.child_get_string('is-healthy')
-        # print('target: {}, lag time: {} ({:.2f} days)'.format(destination_location, lag_time, lag_time / (24*3600)))
+        # print('target: {}, lag time: {} ({})'.format(destination_location, lag_time, lag_time_in_days))
 
 
         if is_healthy != 'true':
             sm_critical.append('{} is not healthy'.format(destination_location))
         elif lag_time > critical_lag_time:
-            sm_critical.append(get_lag_time_output(destination_location, lag_time))
+            sm_critical.append(get_lag_time_output(destination_location, lag_time_in_days))
         elif lag_time > warning_lag_time:
-            sm_warning.append(get_lag_time_output(destination_location, lag_time))
+            sm_warning.append(get_lag_time_output(destination_location, lag_time_in_days))
         else:
-            sm_ok.append('{} lag time {}'.format(destination_location, lag_time))
+            sm_ok.append('{} lag time {}'.format(destination_location, lag_time_in_days))
 
     if len(sm_critical) != 0:
         exit_status = 2
