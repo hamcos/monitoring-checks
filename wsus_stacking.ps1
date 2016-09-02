@@ -15,7 +15,7 @@ $serverName = 'localhost'
 $useSecureConnection = $False
 
 # the port number of your WSUS IIS website
-$portNumber = 80
+$portNumber = 8530
 
 # warn if a computer has not contacted the server for ... days
 $daysBeforeWarn = 14
@@ -33,15 +33,19 @@ $daysBeforeWarn = 14
 # -> http://msdn.microsoft.com/en-us/library/microsoft.updateservices.administration.iupdateserver(VS.85).aspx
 $wsus = [Microsoft.UpdateServices.Administration.AdminProxy]::getUpdateServer($serverName, $useSecureConnection, $portNumber)
 
+# $wsus.GetComputerTargetGroups()
+$servers_group = $wsus.GetComputerTargetGroup("121fce57-5c0a-4388-b885-7eaa09757874")
+
 # get general status information
 # see here for more infos about the properties of GetStatus()
 # -> http://msdn.microsoft.com/en-us/library/microsoft.updateservices.administration.updateserverstatus_properties(VS.85).aspx
 $status = $wsus.GetStatus()
-$totalComputers = $status.ComputerTargetCount
+$totalComputers = $servers_group.GetComputerTargets().count
 
 # computers with errors
 $computerTargetScope = new-object Microsoft.UpdateServices.Administration.ComputerTargetScope
 $computerTargetScope.IncludedInstallationStates = [Microsoft.UpdateServices.Administration.UpdateInstallationStates]::Failed
+$fnord = $computerTargetScope.ComputerTargetGroups.add($servers_group)
 $computersWithErrors = $wsus.GetComputerTargetCount($computerTargetScope)
 
 # computers with needed updates
@@ -53,6 +57,7 @@ $computersNeedingUpdates = $wsus.GetComputerTargetCount($computerTargetScope)
 $computerTargetScope = new-object Microsoft.UpdateServices.Administration.ComputerTargetScope
 $computerTargetScope.IncludedInstallationStates = [Microsoft.UpdateServices.Administration.UpdateInstallationStates]::Unknown
 $computerTargetScope.ExcludedInstallationStates = [Microsoft.UpdateServices.Administration.UpdateInstallationStates]::Failed -bor [Microsoft.UpdateServices.Administration.UpdateInstallationStates]::NotInstalled -bor [Microsoft.UpdateServices.Administration.UpdateInstallationStates]::InstalledPendingReboot -bor [Microsoft.UpdateServices.Administration.UpdateInstallationStates]::Downloaded
+$fnord = $computerTargetScope.ComputerTargetGroups.add($servers_group)
 $computersWithoutStatus = $wsus.GetComputerTargetCount($computerTargetScope)
 
 
@@ -70,7 +75,7 @@ $updatesNeededByComputersNotApproved = $updateServerStatus.UpdatesNeededByComput
 
 # computers that did not contact the server in $daysBeforeWarn days
 $timeSpan = new-object TimeSpan($daysBeforeWarn, 0, 0, 0)
-$computersNotContacted = $wsus.GetComputersNotContactedSinceCount([DateTime]::UtcNow.Subtract($timeSpan))
+$computersNotContacted = ($wsus.GetComputersNotContactedSinceCount([DateTime]::UtcNow.Subtract($timeSpan)) | where {$_.RequestedTargetGroupName -eq "servers" }).count
 
 # computers in the "not assigned" group
 $computerTargetScope = new-object Microsoft.UpdateServices.Administration.ComputerTargetScope
