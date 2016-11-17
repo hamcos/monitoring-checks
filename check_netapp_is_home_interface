@@ -13,8 +13,8 @@ args = len(sys.argv) - 1
 if (args < 3):
     print_usage()
 
-filer    = sys.argv[1]
-user     = sys.argv[2]
+filer = sys.argv[1]
+user = sys.argv[2]
 password = sys.argv[3]
 
 s = NaServer(filer, 1, 1)
@@ -52,17 +52,17 @@ else:
             not_home[vserver].append('{}, home port: {})'.format(name, home_port))
 
     if len(not_home) != 0:
-       exit_status = 1
-       status_detail = "WARN - The following systems do not work with there home ports: {}".format(
-           ['{}: {},\\n'.format(info, not_home[info]) for info in not_home]
-       )
+        exit_status = 1
+        status_detail = "WARN - The following systems do not work with their home ports: {}".format(
+            ['{}: {},\\n'.format(info, not_home[info]) for info in not_home]
+        )
     elif len(home) != 0:
-       status_detail = "OK - All systems are using there home port: {}".format(
-           ['{}: {},\\n'.format(info, home[info]) for info in home]
-       )
-       exit_status = 0
+        status_detail = "OK - All systems are using their home port: {}".format(
+            ['{}: {},\\n'.format(info, home[info]) for info in home]
+        )
+        exit_status = 0
     else:
-       status_detail += "No home ports and no ports which are not home ports found."
+        status_detail += "No home ports and no ports which are not home ports found."
 
 print status_detail
 sys.exit(exit_status)
