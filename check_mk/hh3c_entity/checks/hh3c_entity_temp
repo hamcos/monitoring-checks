@@ -248,7 +248,7 @@ def check_hh3c_entity_temp(item, params, info):
         if unicode(item).startswith(unicode(nr) + ' '):
             ent_physical_descr, temp = elem
             degree_celsius = float(elem[1])
-            return check_temperature(degree_celsius, params)
+            return check_temperature(degree_celsius, params, 'hh3c_entity_temp_{}'.format(item))
 
     return (3, "Invalid information in snmp data")
 
